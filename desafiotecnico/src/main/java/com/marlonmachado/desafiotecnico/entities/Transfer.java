@@ -24,8 +24,8 @@ import java.util.Objects;
                         columnList = "created_at"
                 ),
                 @Index(
-                        name = "idx_transfers_state_created_at",
-                        columnList = "state, created_at"
+                        name = "idx_transfers_status_created_at",
+                        columnList = "status, created_at"
                 )
         }
 )
