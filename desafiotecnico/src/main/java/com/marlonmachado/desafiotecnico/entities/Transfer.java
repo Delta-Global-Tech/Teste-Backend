@@ -43,10 +43,10 @@ public class Transfer {
     @JoinColumn(name = "destination_account_id", nullable = false)
     private Account targetAccount;
 
-    @JoinColumn(nullable = false)
+    @Column(name = "amount_cents", nullable = false)
     private Long amountCents;
 
-    @JoinColumn(nullable = false)
+    @Column(name = "fee_cents", nullable = false)
     private Long feeCents;
 
     @Enumerated(EnumType.STRING)
@@ -57,10 +57,10 @@ public class Transfer {
     @JoinColumn(name = "original_transfer_id")
     private Transfer originalTransfer;
 
-    @Column(name = "amount_cents", nullable = false)
+    @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
-    @Column(name = "fee_cents", nullable = false)
+    @Column(name = "completed_at", nullable = false)
     private Instant completedAt;
 
     public Transfer() {
