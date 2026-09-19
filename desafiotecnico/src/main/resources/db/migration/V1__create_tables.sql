@@ -49,6 +49,7 @@ CREATE TABLE scheduled(
     execute_at             TIMESTAMPTZ NOT NULL,
     state                  VARCHAR(20) NOT NULL,
     attempts               INT         NOT NULL DEFAULT 0,
+    failure_reason         VARCHAR(255) NULL,
     transfer_id            BIGINT NULL REFERENCES transfers(id)
 );
 
@@ -57,7 +58,7 @@ CREATE TABLE idempotency_records(
     idempotency_key VARCHAR(255) NOT NULL,
     endpoint        VARCHAR(100) NOT NULL,
     request_hash    VARCHAR(64)  NOT NULL,
-    response_json   JSONB        NOT NULL,
+    response_json   TEXT NOT NULL,
     http_status     INT          NOT NULL,
     created_at      TIMESTAMPTZ  NOT NULL,
     CONSTRAINT uk_idempotency_endpoint_key UNIQUE (endpoint, idempotency_key)

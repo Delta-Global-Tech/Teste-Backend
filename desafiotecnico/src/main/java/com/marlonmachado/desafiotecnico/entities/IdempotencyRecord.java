@@ -1,6 +1,8 @@
 package com.marlonmachado.desafiotecnico.entities;
 
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.Objects;
@@ -30,7 +32,7 @@ public class IdempotencyRecord {
     @Column(name = "request_hash", nullable = false, length = 64)
     private String requestHash;
 
-    @Column(name = "response_json", nullable = false, columnDefinition = "jsonb")
+    @Column(name = "response_json", nullable = false)
     private String responseJson;
 
     @Column(name = "http_status", nullable = false)

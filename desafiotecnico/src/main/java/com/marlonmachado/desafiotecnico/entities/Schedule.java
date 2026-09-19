@@ -44,6 +44,9 @@ public class Schedule {
     @Column(nullable = false)
     private int attempts;
 
+    @Column(name = "failure_reason", length = 255)
+    private String failureReason;
+
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "transfer_id")
     private Transfer transfer;
@@ -51,7 +54,7 @@ public class Schedule {
     public Schedule() {
     }
 
-    public Schedule(Long id, Account sourceAccount, Account destinationAccount, long amountCents, Instant executeAt, ScheduleStatus state, int attempts, Transfer transfer) {
+    public Schedule(Long id, Account sourceAccount, Account destinationAccount, long amountCents, Instant executeAt, ScheduleStatus state, int attempts, String failureReason ,Transfer transfer) {
         this.id = id;
         this.sourceAccount = sourceAccount;
         this.destinationAccount = destinationAccount;
@@ -59,6 +62,7 @@ public class Schedule {
         this.executeAt = executeAt;
         this.state = state;
         this.attempts = attempts;
+        this.failureReason = failureReason;
         this.transfer = transfer;
     }
 
@@ -116,6 +120,14 @@ public class Schedule {
 
     public void setAttempts(int attempts) {
         this.attempts = attempts;
+    }
+
+    public String getFailureReason() {
+        return failureReason;
+    }
+
+    public void setFailureReason(String failureReason) {
+        this.failureReason = failureReason;
     }
 
     public Transfer getTransfer() {

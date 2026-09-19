@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.Objects;
 
 
 @Entity
@@ -99,4 +100,79 @@ public class Movement {
     }
 
 
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+
+    public Account getAccount() {
+        return account;
+    }
+
+    public void setAccount(Account account) {
+        this.account = account;
+    }
+
+    public Transfer getTransfer() {
+        return transfer;
+    }
+
+    public void setTransfer(Transfer transfer) {
+        this.transfer = transfer;
+    }
+
+    public long getSequence() {
+        return sequence;
+    }
+
+    public void setSequence(long sequence) {
+        this.sequence = sequence;
+    }
+
+    public MovementType getType() {
+        return type;
+    }
+
+    public void setType(MovementType type) {
+        this.type = type;
+    }
+
+    public long getAmountCents() {
+        return amountCents;
+    }
+
+    public void setAmountCents(long amountCents) {
+        this.amountCents = amountCents;
+    }
+
+    public long getBalanceAfterCents() {
+        return balanceAfterCents;
+    }
+
+    public void setBalanceAfterCents(long balanceAfterCents) {
+        this.balanceAfterCents = balanceAfterCents;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(Instant createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (o == null || getClass() != o.getClass()) return false;
+        Movement movement = (Movement) o;
+        return Objects.equals(getId(), movement.getId());
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hashCode(getId());
+    }
 }

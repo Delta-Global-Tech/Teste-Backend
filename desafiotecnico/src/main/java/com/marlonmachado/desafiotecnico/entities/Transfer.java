@@ -2,6 +2,7 @@ package com.marlonmachado.desafiotecnico.entities;
 
 
 import com.marlonmachado.desafiotecnico.entities.enums.TransferStatus;
+import com.marlonmachado.desafiotecnico.exceptions.IllegalStateTransitionException;
 import jakarta.persistence.*;
 
 import java.time.Instant;
@@ -60,7 +61,7 @@ public class Transfer {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
-    @Column(name = "completed_at", nullable = false)
+    @Column(name = "completed_at")
     private Instant completedAt;
 
     public Transfer() {
@@ -77,6 +78,29 @@ public class Transfer {
         this.originalTransfer = originalTransfer;
         this.createdAt = createdAt;
         this.completedAt = completedAt;
+    }
+
+
+    public void confirm(Instant now) {
+        if (!this.status.canTransitionTo(TransferStatus.CONFIRMED)) {
+            throw new IllegalStateTransitionException(this.status ,TransferStatus.CONFIRMED);
+        }
+        this.status = TransferStatus.CONFIRMED;
+        this.completedAt = now;
+    }
+
+    public void reverse() {
+        if (!this.status.canTransitionTo(TransferStatus.REVERSED)) {
+            throw new IllegalStateTransitionException(this.status,TransferStatus.REVERSED);
+        }
+        this.status = TransferStatus.REVERSED;
+    }
+
+    public void fail() {
+        if (!this.status.canTransitionTo(TransferStatus.FAILED)) {
+            throw new IllegalStateTransitionException(this.status, TransferStatus.FAILED);
+        }
+        this.status = TransferStatus.FAILED;
     }
 
     public Long getId() {
