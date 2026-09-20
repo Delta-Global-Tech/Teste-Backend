@@ -1,0 +1,16 @@
+
+services:
+  postgres:
+    image: postgres:16
+    container_name: desafiotecnico-postgres
+    environment:
+      POSTGRES_DB: desafiotecnico
+      POSTGRES_USER: desafiotecnico
+      POSTGRES_PASSWORD: desafiotecnico
+    ports:
+      - "5433:5432"
+    volumes:
+      - desafiotecnico-data:/var/lib/postgresql/data
+
+volumes:
+  desafiotecnico-data:
