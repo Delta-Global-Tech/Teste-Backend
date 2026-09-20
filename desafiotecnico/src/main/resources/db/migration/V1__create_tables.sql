@@ -25,7 +25,7 @@ CREATE TABLE transfers(
     status                 VARCHAR(15) NOT NULL,
     original_transfer_id   BIGINT NULL REFERENCES transfers(id),
     created_at             TIMESTAMPTZ NOT NULL,
-    completed_at           TIMESTAMPTZ NULL,
+    completed_at           TIMESTAMPTZ NOT NULL,
     CONSTRAINT uk_transfers_original_reversal UNIQUE (original_transfer_id)
 );
 

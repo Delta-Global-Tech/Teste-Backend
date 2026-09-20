@@ -1,4 +1,4 @@
-package com.marlonmachado.desafiotecnico.entities;
+package com.marlonmachado.desafiotecnico.integration;
 
 
 import org.junit.jupiter.api.Test;

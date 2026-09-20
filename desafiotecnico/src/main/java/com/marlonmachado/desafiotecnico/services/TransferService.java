@@ -17,10 +17,16 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 public class TransferService {
@@ -33,23 +39,23 @@ public class TransferService {
     private static final long MAX_DEPOSIT_CENTS = 1_000_000L;
 
     @Autowired
-    private  AccountRepository accountRepository;
+    private AccountRepository accountRepository;
 
     @Autowired
-    private  TransferRepository transferRepository;
+    private TransferRepository transferRepository;
 
     @Autowired
-    private  MovementRepository movementRepository;
+    private MovementRepository movementRepository;
 
     @Autowired
-    private  IdempotencyService idempotencyService;
+    private IdempotencyService idempotencyService;
 
     @Autowired
     private FeeCalculator feeCalculator;
 
 
     @Transactional
-    public TransferReceiptDTO deposit(String accountNumber, Double valorEmReais, String idempotencyKey) {
+    public TransferReceiptDTO deposit(String accountNumber, BigDecimal valorEmReais, String idempotencyKey) {
 
         Optional<IdempotencyRecord> registroExistente = idempotencyService.buscarRegistroExistente(
                 ENDPOINT_DEPOSITO, idempotencyKey, valorEmReais);
@@ -58,7 +64,7 @@ public class TransferService {
             return idempotencyService.lerResposta(registroExistente.get(), TransferReceiptDTO.class);
         }
 
-        long amountCents = Math.round(valorEmReais * 100);
+        long amountCents = reaisParaCentavos(valorEmReais);
 
         if (amountCents <= 0) {
             throw new BusinessException(HttpStatus.UNPROCESSABLE_ENTITY, "VALOR_INVALIDO",
@@ -106,9 +112,9 @@ public class TransferService {
                 SYSTEM_ENTRY_ACCOUNT_NUMBER,
                 accountNumber,
                 valorEmReais,
-                0.0,
+                BigDecimal.ZERO,
                 valorEmReais,
-                saldoAposCredito / 100.0,
+                centavosParaReais(saldoAposCredito),
                 now.toString()
         );
 
@@ -119,7 +125,7 @@ public class TransferService {
 
 
     @Transactional
-    public TransferReceiptDTO transfer(String contaOrigemNumero, String contaDestinoNumero, Double valorEmReais, String idempotencyKey) {
+    public TransferReceiptDTO transfer(String contaOrigemNumero, String contaDestinoNumero, BigDecimal valorEmReais, String idempotencyKey) {
 
         Optional<IdempotencyRecord> registroExistente = idempotencyService.buscarRegistroExistente(
                 ENDPOINT_TRANSFERENCIA, idempotencyKey, new TransferRequestDTO(contaOrigemNumero, contaDestinoNumero, valorEmReais));
@@ -133,24 +139,68 @@ public class TransferService {
                     "Conta de origem não pode ser igual à conta de destino");
         }
 
-        long valorCentavos = Math.round(valorEmReais * 100);
+        long valorCentavos = reaisParaCentavos(valorEmReais);
 
         if (valorCentavos <= 0) {
             throw new BusinessException(HttpStatus.UNPROCESSABLE_ENTITY, "VALOR_INVALIDO",
                     "Valor da transferência deve ser maior que zero");
         }
 
-        Account origem = accountRepository.findByNumber(contaOrigemNumero)
-                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "RECURSO_NAO_ENCONTRADO",
-                        "Conta de origem não encontrada: " + contaOrigemNumero));
-        Account destino = accountRepository.findByNumber(contaDestinoNumero)
-                .orElseThrow(() -> new BusinessException(HttpStatus.NOT_FOUND, "RECURSO_NAO_ENCONTRADO",
-                        "Conta de destino não encontrada: " + contaDestinoNumero));
+        Long origemId = accountRepository
+                .findIdByAccountNumber(contaOrigemNumero)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND,
+                        "RECURSO_NAO_ENCONTRADO",
+                        "Conta de origem não encontrada: " + contaOrigemNumero
+                ));
+
+        Long destinoId = accountRepository
+                .findIdByAccountNumber(contaDestinoNumero)
+                .orElseThrow(() -> new BusinessException(
+                        HttpStatus.NOT_FOUND,
+                        "RECURSO_NAO_ENCONTRADO",
+                        "Conta de destino não encontrada: " + contaDestinoNumero
+                ));
 
 
+        long taxaCentavos = feeCalculator.calculate(valorCentavos);
 
-        Account contaOrigem = accountRepository.findByNumber(contaOrigemNumero).orElseThrow();
-        Account contaDestino = accountRepository.findByNumber(contaDestinoNumero).orElseThrow();
+        Account sistemaTaxasSemLock = null;
+
+        if (taxaCentavos > 0) {
+            sistemaTaxasSemLock = accountRepository
+                    .findByNumber(SYSTEM_FEES_ACCOUNT_NUMBER)
+                    .orElseThrow(() -> new BusinessException(
+                            HttpStatus.NOT_FOUND,
+                            "RECURSO_NAO_ENCONTRADO",
+                            "Conta SISTEMA-TAXAS não encontrada"
+                    ));
+        }
+
+        List<Long> idsParaBloquear = new ArrayList<>();
+        idsParaBloquear.add(origemId);
+        idsParaBloquear.add(destinoId);
+
+        if (sistemaTaxasSemLock != null) {
+            idsParaBloquear.add(sistemaTaxasSemLock.getId());
+        }
+
+        List<Account> contasBloqueadas =
+                bloquearContasEmOrdem(idsParaBloquear);
+
+        Map<Long, Account> contasPorId = contasBloqueadas.stream()
+                .collect(Collectors.toMap(
+                        Account::getId,
+                        account -> account
+                ));
+
+
+        Account contaOrigem = contasPorId.get(origemId);
+        Account contaDestino = contasPorId.get(destinoId);
+
+        Account sistemaTaxas = sistemaTaxasSemLock == null
+                ? null
+                : contasPorId.get(sistemaTaxasSemLock.getId());
 
         if (!contaOrigem.getAccountStatus().canSend()) {
             throw new BusinessException(HttpStatus.CONFLICT, "CONTA_NAO_PODE_ENVIAR",
@@ -161,7 +211,6 @@ public class TransferService {
                     "Conta de destino encerrada não pode receber transferência");
         }
 
-        long taxaCentavos = feeCalculator.calculate(valorCentavos);
         long totalDebitado = valorCentavos + taxaCentavos;
 
         if (contaOrigem.getBalanceCents() < totalDebitado) {
@@ -170,6 +219,7 @@ public class TransferService {
         }
 
         long usadoHoje = valorTransferidoHoje(contaOrigem.getId());
+
         if (usadoHoje + valorCentavos > contaOrigem.getDailyLimitCents()) {
             throw new BusinessException(HttpStatus.UNPROCESSABLE_ENTITY, "LIMITE_DIARIO_EXCEDIDO",
                     "Limite diário de transferência excedido");
@@ -179,43 +229,105 @@ public class TransferService {
 
         Transfer transferencia = new Transfer(null, contaOrigem, contaDestino, valorCentavos,
                 taxaCentavos, TransferStatus.CREATED, null, agora, null);
+
         transferencia.confirm(agora);
         transferencia = transferRepository.save(transferencia);
 
         long saldoOrigemApos = contaOrigem.getBalanceCents() - totalDebitado;
-        contaOrigem.setBalanceCents(saldoOrigemApos);
-        accountRepository.save(contaOrigem);
 
         long saldoDestinoApos = contaDestino.getBalanceCents() + valorCentavos;
+
+        contaOrigem.setBalanceCents(saldoOrigemApos);
         contaDestino.setBalanceCents(saldoDestinoApos);
+
+        accountRepository.save(contaOrigem);
         accountRepository.save(contaDestino);
 
-        movementRepository.save(Movement.debit(contaOrigem, transferencia,
-                proximaSequenciaPara(contaOrigem.getId()), valorCentavos, saldoOrigemApos + taxaCentavos, agora));
+        long saldoOrigemAposTransferencia =
+                contaOrigem.getBalanceCents() + taxaCentavos;
 
-        movementRepository.save(Movement.credit(contaDestino, transferencia,
-                proximaSequenciaPara(contaDestino.getId()), valorCentavos, saldoDestinoApos, agora));
+
+        movementRepository.save(
+                Movement.debit(
+                        contaOrigem,
+                        transferencia,
+                        proximaSequenciaPara(contaOrigem.getId()),
+                        valorCentavos,
+                        saldoOrigemAposTransferencia,
+                        agora
+                )
+        );
+
+        movementRepository.save(
+                Movement.credit(contaDestino,
+                        transferencia,
+                        proximaSequenciaPara(contaDestino.getId()),
+                        valorCentavos,
+                        saldoDestinoApos,
+                        agora
+                )
+        );
 
         if (taxaCentavos > 0) {
-            Account sistemaTaxas = accountRepository.findByNumber(SYSTEM_FEES_ACCOUNT_NUMBER).orElseThrow();
-            sistemaTaxas.setBalanceCents(sistemaTaxas.getBalanceCents() + taxaCentavos);
+            sistemaTaxas.setBalanceCents(
+                    sistemaTaxas.getBalanceCents() + taxaCentavos
+            );
             accountRepository.save(sistemaTaxas);
 
-            movementRepository.save(Movement.debit(contaOrigem, transferencia,
-                    proximaSequenciaPara(contaOrigem.getId()), taxaCentavos, saldoOrigemApos, agora));
+            movementRepository.save(
+                    Movement.debit(
+                            contaOrigem,
+                            transferencia,
+                            proximaSequenciaPara(contaOrigem.getId()),
+                            taxaCentavos,
+                            saldoOrigemApos,
+                            agora
+                    )
+            );
 
-            movementRepository.save(Movement.credit(sistemaTaxas, transferencia,
-                    proximaSequenciaPara(sistemaTaxas.getId()), taxaCentavos, sistemaTaxas.getBalanceCents(), agora));
+            movementRepository.save(
+                    Movement.credit(
+                            sistemaTaxas,
+                            transferencia,
+                            proximaSequenciaPara(sistemaTaxas.getId()),
+                            taxaCentavos,
+                            sistemaTaxas.getBalanceCents(),
+                            agora
+                    )
+            );
         }
 
         TransferReceiptDTO comprovante = new TransferReceiptDTO(
-                transferencia.getId(), contaOrigemNumero, contaDestinoNumero, valorEmReais,
-                taxaCentavos / 100.0, totalDebitado / 100.0, saldoOrigemApos / 100.0, agora.toString());
+                transferencia.getId(),
+                contaOrigemNumero,
+                contaDestinoNumero,
+                valorEmReais,
+                centavosParaReais(taxaCentavos),
+                centavosParaReais(totalDebitado),
+                centavosParaReais(saldoOrigemApos),
+                agora.toString());
 
-        idempotencyService.salvarRegistro(ENDPOINT_TRANSFERENCIA, idempotencyKey,
+        idempotencyService.salvarRegistro(
+                ENDPOINT_TRANSFERENCIA,
+                idempotencyKey,
                 new TransferRequestDTO(contaOrigemNumero, contaDestinoNumero, valorEmReais), comprovante, 201);
 
         return comprovante;
+    }
+
+    private List<Account> bloquearContasEmOrdem(
+            List<Long> ids
+    ) {
+        return ids.stream()
+                .distinct()
+                .sorted()
+                .map(id -> accountRepository.findByIdForUpdate(id)
+                        .orElseThrow(() -> new BusinessException(
+                                HttpStatus.NOT_FOUND,
+                                "RECURSO_NAO_ENCONTRADO",
+                                "Conta não encontrada: " + id
+                        )))
+                .toList();
     }
 
     private long valorTransferidoHoje(Long contaId) {
@@ -230,7 +342,6 @@ public class TransferService {
                 .map(m -> m.getSequence() + 1L)
                 .orElse(1L);
     }
-
 
 
     @Transactional
@@ -258,11 +369,23 @@ public class TransferService {
         Long primeiroId = Math.min(contaOrigemOriginal.getId(), contaDestinoOriginal.getId());
         Long segundoId = Math.max(contaOrigemOriginal.getId(), contaDestinoOriginal.getId());
 
-        accountRepository.findByIdForUpdate(primeiroId).orElseThrow();
-        accountRepository.findByIdForUpdate(segundoId).orElseThrow();
+        Account primeiro = accountRepository
+                .findByIdForUpdate(primeiroId)
+                .orElseThrow();
 
-        Account contaQueRecebeuOriginal = accountRepository.findByNumber(contaDestinoOriginal.getNumber()).orElseThrow();
-        Account contaQueEnviouOriginal = accountRepository.findByNumber(contaOrigemOriginal.getNumber()).orElseThrow();
+        Account segundo = accountRepository
+                .findByIdForUpdate(segundoId)
+                .orElseThrow();
+
+        Account contaQueRecebeuOriginal =
+                primeiro.getId().equals(contaDestinoOriginal.getId())
+                        ? primeiro
+                        : segundo;
+
+        Account contaQueEnviouOriginal =
+                primeiro.getId().equals(contaOrigemOriginal.getId())
+                        ? primeiro
+                        : segundo;
 
         long valorDevolvido = original.getAmountCents() + original.getFeeCents();
 
@@ -296,12 +419,28 @@ public class TransferService {
                 proximaSequenciaPara(contaQueEnviouOriginal.getId()), valorDevolvido, saldoQuemEnviouApos, agora));
 
         TransferReceiptDTO comprovante = new TransferReceiptDTO(
-                estorno.getId(), contaDestinoOriginal.getNumber(), contaOrigemOriginal.getNumber(),
-                original.getAmountCents() / 100.0, original.getFeeCents() / 100.0, valorDevolvido / 100.0,
-                saldoQuemRecebeuApos / 100.0, agora.toString());
+                estorno.getId(),
+                contaDestinoOriginal.getNumber(),
+                contaOrigemOriginal.getNumber(),
+                centavosParaReais(original.getAmountCents()),
+                centavosParaReais(original.getFeeCents()),
+                centavosParaReais(valorDevolvido),
+                centavosParaReais(saldoQuemRecebeuApos),
+                agora.toString());
 
         idempotencyService.salvarRegistro(ENDPOINT_ESTORNO, idempotencyKey, transferenciaId, comprovante, 201);
 
         return comprovante;
+    }
+
+    private long reaisParaCentavos(BigDecimal valorEmReais) {
+        return valorEmReais
+                .setScale(2, RoundingMode.HALF_UP)
+                .movePointRight(2)
+                .longValueExact();
+    }
+
+    private BigDecimal centavosParaReais(long valorCentavos) {
+        return BigDecimal.valueOf(valorCentavos, 2);
     }
 }

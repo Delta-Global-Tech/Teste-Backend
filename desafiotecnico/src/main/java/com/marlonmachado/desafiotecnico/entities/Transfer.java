@@ -61,7 +61,7 @@ public class Transfer {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
-    @Column(name = "completed_at")
+    @Column(name = "completed_at", nullable = false)
     private Instant completedAt;
 
     public Transfer() {

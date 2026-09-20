@@ -22,6 +22,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
@@ -61,13 +62,16 @@ public class AccountService {
                 .map(m -> new MovementDTO(
                         m.getId(),
                         m.getType().name(),
-                        m.getAmountCents() / 100.0,
-                        m.getBalanceAfterCents() / 100.0,
+                        centavosParaReais(m.getAmountCents()),
+                        centavosParaReais(m.getBalanceAfterCents()),
                         m.getCreatedAt()
                 ))
                 .toList();
 
-        return new StatementDTO(numeroConta, conta.getBalanceCents() / 100.0, linhas);
+        return new StatementDTO(
+                numeroConta,
+                centavosParaReais(conta.getBalanceCents()),
+                linhas);
     }
 
     @Transactional(readOnly = true)
@@ -85,18 +89,32 @@ public class AccountService {
 
         return new SummaryDTO(
                 contasAtivas,
-                (saldoTotalUsuariosCentavos != null ? saldoTotalUsuariosCentavos : 0L) / 100.0,
+                centavosParaReais(saldoTotalUsuariosCentavos),
                 agendamentosPendentes,
                 resumoJanela.getTotalTransferencias(),
                 centavosParaReais(resumoJanela.getValorTransferido()),
                 centavosParaReais(resumoJanela.getTaxas()),
-                resumoJanela.getTicketMedio() != null ? resumoJanela.getTicketMedio() / 100.0 : 0.0,
+                mediaCentavosParaReais(resumoJanela.getTicketMedio()),
                 resumoJanela.getTotalEstornos(),
                 somaMovimentosCentavos != null && somaMovimentosCentavos == 0L
         );
     }
 
-    private Double centavosParaReais(Long centavos) {
-        return centavos != null ? centavos / 100.0 : 0.0;
+    private BigDecimal centavosParaReais(Long centavos) {
+        if (centavos == null) {
+            return BigDecimal.ZERO.setScale(2);
+        }
+
+        return BigDecimal.valueOf(centavos, 2);
+    }
+
+    private BigDecimal mediaCentavosParaReais(Number mediaEmCentavos) {
+        if (mediaEmCentavos == null) {
+            return BigDecimal.ZERO.setScale(2);
+        }
+
+        return new BigDecimal(mediaEmCentavos.toString())
+                .movePointLeft(2)
+                .setScale(2, java.math.RoundingMode.HALF_UP);
     }
 }

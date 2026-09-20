@@ -22,4 +22,13 @@ public interface AccountRepository extends JpaRepository<Account, Long> {
 
     @Query("SELECT COALESCE(SUM(a.balanceCents), 0) FROM Account a WHERE a.user IS NOT NULL")
     Long sumBalanceOfUserAccounts();
+
+    @Query("""
+            SELECT a.id
+            FROM Account a
+            WHERE a.number = :accountNumber
+            """)
+    Optional<Long> findIdByAccountNumber(
+            @Param("accountNumber") String accountNumber
+    );
 }

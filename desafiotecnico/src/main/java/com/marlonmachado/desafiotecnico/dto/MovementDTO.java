@@ -1,12 +1,13 @@
 package com.marlonmachado.desafiotecnico.dto;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 
 public record MovementDTO(
         Long id,
         String tipo,
-        Double valor,
-        Double saldoApos,
+        BigDecimal valor,
+        BigDecimal saldoApos,
         Instant criadoEm
 ) {
 }

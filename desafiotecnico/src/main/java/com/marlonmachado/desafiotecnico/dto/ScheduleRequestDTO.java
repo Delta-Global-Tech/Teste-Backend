@@ -4,6 +4,7 @@ import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 
 public record ScheduleRequestDTO(
@@ -15,7 +16,7 @@ public record ScheduleRequestDTO(
 
         @NotNull(message = "Valor é obrigatório")
         @DecimalMin(value = "0.01", message = "Valor deve ser maior que zero")
-        Double valor,
+        BigDecimal valor,
 
         @NotNull(message = "Data de execução é obrigatória")
         Instant executarEm

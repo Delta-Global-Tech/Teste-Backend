@@ -15,6 +15,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.Optional;
 
@@ -33,7 +35,7 @@ public class ScheduleService {
     private IdempotencyService idempotencyService;
 
     @Transactional
-    public ScheduleResponseDTO create(String contaOrigemNumero, String contaDestinoNumero, Double valorEmReais,
+    public ScheduleResponseDTO create(String contaOrigemNumero, String contaDestinoNumero, BigDecimal valorEmReais,
                                       Instant executarEm, String idempotencyKey) {
 
         ScheduleRequestDTO corpo = new ScheduleRequestDTO(contaOrigemNumero, contaDestinoNumero, valorEmReais, executarEm);
@@ -45,7 +47,7 @@ public class ScheduleService {
             return idempotencyService.lerResposta(registroExistente.get(), ScheduleResponseDTO.class);
         }
 
-        long valorCentavos = Math.round(valorEmReais * 100);
+        long valorCentavos = converterParaCentavos(valorEmReais);
 
         if (valorCentavos <= 0) {
             throw new BusinessException(HttpStatus.UNPROCESSABLE_ENTITY, "VALOR_INVALIDO",
@@ -79,5 +81,21 @@ public class ScheduleService {
         idempotencyService.salvarRegistro(ENDPOINT_AGENDAMENTO, idempotencyKey, corpo, resposta, 201);
 
         return resposta;
+    }
+
+    private long converterParaCentavos(BigDecimal valorEmReais) {
+        try {
+            return valorEmReais
+                    .setScale(2, RoundingMode.HALF_UP)
+                    .movePointRight(2)
+                    .longValueExact();
+
+        } catch (ArithmeticException exception) {
+            throw new BusinessException(
+                    HttpStatus.UNPROCESSABLE_ENTITY,
+                    "VALOR_INVALIDO",
+                    "Valor monetário inválido"
+            );
+        }
     }
 }

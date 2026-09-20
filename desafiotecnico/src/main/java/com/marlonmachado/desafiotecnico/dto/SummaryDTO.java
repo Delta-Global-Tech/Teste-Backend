@@ -1,13 +1,15 @@
 package com.marlonmachado.desafiotecnico.dto;
 
+import java.math.BigDecimal;
+
 public record SummaryDTO(
         Long contasAtivasAgora,
-        Double saldoTotalUsuariosAgora,
+        BigDecimal saldoTotalUsuariosAgora,
         Long agendamentosPendentesAgora,
         Long transferenciasNaJanela,
-        Double valorTransferidoNaJanela,
-        Double taxasNaJanela,
-        Double ticketMedioNaJanela,
+        BigDecimal valorTransferidoNaJanela,
+        BigDecimal taxasNaJanela,
+        BigDecimal ticketMedioNaJanela,
         Long estornosNaJanela,
         Boolean somaDosMovimentosEhZero
 ) {

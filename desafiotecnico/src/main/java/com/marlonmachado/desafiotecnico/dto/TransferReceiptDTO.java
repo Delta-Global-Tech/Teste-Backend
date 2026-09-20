@@ -1,13 +1,15 @@
 package com.marlonmachado.desafiotecnico.dto;
 
+import java.math.BigDecimal;
+
 public record TransferReceiptDTO(
         Long transferenciaId,
         String contaOrigem,
         String contaDestino,
-        Double valor,
-        Double taxa,
-        Double totalDebitado,
-        Double saldoOrigemApos,
+        BigDecimal valor,
+        BigDecimal taxa,
+        BigDecimal totalDebitado,
+        BigDecimal saldoOrigemApos,
         String concluidaEm
 ) {
 }
