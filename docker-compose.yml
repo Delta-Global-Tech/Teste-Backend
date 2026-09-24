@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: postgres
+    environment:
+      - POSTGRES_PASSWORD=andre123
+      - POSTGRES_USER=andre
+      - POSTGRES_DB=myapp
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U andre -d myapp"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app_1:
+    build: ./delta
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/myapp
+      - SPRING_DATASOURCE_USERNAME=andre
+      - SPRING_DATASOURCE_PASSWORD=andre123
+    ports:
+      - "8080:8080"
+
+  app_2:
+    build: ./delta
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres:5432/myapp
+      - SPRING_DATASOURCE_USERNAME=andre
+      - SPRING_DATASOURCE_PASSWORD=andre123
+    ports:
+      - "8090:8080"
