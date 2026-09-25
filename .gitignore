@@ -1,0 +1,29 @@
+# Maven
+target/
+*.class
+
+# Eclipse
+.metadata/
+.classpath
+.project
+.settings/
+
+# IntelliJ
+.idea/
+*.iml
+
+# VS Code
+.vscode/
+
+# Logs e arquivos temporários
+*.log
+concorrencia-log.txt
+resultado-concorrencia.txt
+teste-cenario1.txt
+
+# Sistema operacional
+.DS_Store
+Thumbs.db
+
+# Ambiente local
+.env

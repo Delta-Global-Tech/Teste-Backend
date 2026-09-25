@@ -1,0 +1,20 @@
+spring:
+  application:
+    name: financial-transfer
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5433}/${DB_NAME:financial_transfer}
+    username: ${DB_USER:transfer_user}
+    password: ${DB_PASSWORD:transfer_pass}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+server:
+  port: ${SERVER_PORT:8080}
